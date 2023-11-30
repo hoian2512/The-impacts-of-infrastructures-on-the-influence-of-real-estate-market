@@ -1,0 +1,121 @@
+# CFA
+real = read.csv("real.csv", header = TRUE)
+```{r get_data, message=FALSE}
+library(psych)
+library(lavaan)
+data <- real
+View(real)
+```
+
+
+## CFA
+```{r, tidy=FALSE}
+m1_model <- ' infcom =~ I1 + I2 + I3 
+              inffin =~ F1 + F3
+              macro =~ M1 + M2 + M3 + M4 + M5 + M6 + M7
+              R =~ R1 + R2 + R3
+   
+    # covariance
+     inffin ~~ 0*infcom
+      inffin ~~ 0*macro
+      inffin ~~ 0*R
+      infcom ~~ 0*macro
+      #infcom ~~ 0*R
+      macro ~~ 0*R
+    # variances
+      M4 ~~ M4
+      F1 ~~ 0*F1
+      R2 ~~ 0*R2
+   
+      
+   
+'
+
+m1_fit <- cfa(m1_model, data=data, check.gradient = FALSE, auto.cov.lv.x=FALSE, std.lv = TRUE)
+summary(m1_fit, standardized=TRUE)
+```
+
+
+* **`Variances`**: Latent factor variances can be constrained for identifiability purposes to be 1, but in this case, one of the loadings was constrained to be one. Variances for items represent the variance not explained by the latent factor.
+
+```{r}
+varTable(m1_fit)
+```
+```{r}
+lavInspect(m1_fit, "cov.lv")
+```
+
+
+```{r}
+variances <- c(I1_I1=subset(parameterestimates(m1_fit), 
+    lhs == 'I1' & rhs == 'I1')[, 'est'],
+               I_I=subset(parameterestimates(m1_fit), 
+    lhs == 'infcom' & rhs == 'infcom')[, 'est'],
+               I_I1=subset(parameterestimates(m1_fit), 
+    lhs == 'infcom' & rhs == 'I1')[, 'est'])
+
+cbind(parameters = c(variances, 
+               total=variances['I_I1'] * variances['I_I'] + variances['I1_I1'],
+            raw_divide_by_n_minus_1=var(data[,'I1'])))
+```
+
+* The output above shows the unstandardised parameters related to the item `I1`.
+* `I1_I1` corresponds to the unstandardised unique variance for the item.
+* `I_I` times `I_I1` represents the unstandardised common variance.
+* Thus, the sum of the unique and common variance represents the total variance.
+
+## Modification indices
+```{r}
+m1_mod <- modificationindices(m1_fit)
+m1_mod_summary <- subset(m1_mod, mi > 100)
+m1_mod_summary[order(m1_mod_summary$mi, decreasing=TRUE), ]
+```
+
+* `modificationindices` suggests several ad hoc modifications that could be made to improve the fit of the model.
+```{r}
+m1_mod <- modificationIndices(m1_fit)
+head(m1_mod[order(m1_mod$mi, decreasing=TRUE), ], 20)
+```
+
+
+
+```{r}
+head(parameterestimates(m1_fit), 10)
+
+```
+
+
+
+### Covariance
+
+```{r}
+inspect(m1_fit, 'cov.lv'=cov.lv(m1_fit))$psi
+```
+
+The following analysis compare the fit of the unconstrained with the equal-covariance model.
+
+
+```{r }
+parTable(m1_fit)
+```
+
+```{r}
+summary(m1_fit)
+```
+```{r}
+fitMeasures(m1_fit)
+# equivalent to:
+# inspect(m1_fit, 'fit.measures')
+
+fitMeasures(m1_fit)['rmsea']
+fitMeasures(m1_fit, c('rmsea', 'rmsea.ci.lower', 'rmsea.ci.upper'))
+
+
+summary(m1_fit, fit.measures=TRUE)
+```
+```{r}
+summary(m1_fit)
+standardizedSolution(m1_fit)
+summary(m1_fit)
+```
+
